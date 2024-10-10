@@ -125,4 +125,21 @@ brfss_2010 =
       query = list("$limit" = 5000)) |> 
   content("parsed")
 ```
+## Some data aren't so nice
 
+Let's loot at Pokemon API
+
+```{r}
+poke = 
+  GET("http://pokeapi.co/api/v2/pokemon/1") |>
+  content()
+
+poke[["name"]]
+poke$name
+poke$height
+poke$abilities
+```
+
+## Closing thoughts
+
+Be reasonable.
