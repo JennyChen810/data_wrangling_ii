@@ -173,3 +173,157 @@ data_marj |>
 ```
 
 <img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-15-1.png" width="90%" />
+\## Restaurant inspections
+
+``` r
+data("rest_inspec")
+
+rest_inspec |> 
+  group_by(boro, grade) |> 
+  summarize(n = n()) |> 
+  pivot_wider(names_from = grade, values_from = n)
+```
+
+    ## `summarise()` has grouped output by 'boro'. You can override using the
+    ## `.groups` argument.
+
+    ## # A tibble: 6 × 8
+    ## # Groups:   boro [6]
+    ##   boro              A     B     C `Not Yet Graded`     P     Z  `NA`
+    ##   <chr>         <int> <int> <int>            <int> <int> <int> <int>
+    ## 1 BRONX         13688  2801   701              200   163   351 16833
+    ## 2 BROOKLYN      37449  6651  1684              702   416   977 51930
+    ## 3 MANHATTAN     61608 10532  2689              765   508  1237 80615
+    ## 4 Missing           4    NA    NA               NA    NA    NA    13
+    ## 5 QUEENS        35952  6492  1593              604   331   913 45816
+    ## 6 STATEN ISLAND  5215   933   207               85    47   149  6730
+
+To simplify things, I’ll remove inspections with scores other than A, B,
+or C, and also remove the restaurants with missing boro information.
+I’ll also clean up boro names a bit.
+
+``` r
+rest_inspec =
+  rest_inspec |>
+  filter(grade %in% c("A", "B", "C"), boro != "Missing") |> 
+  mutate(boro = str_to_title(boro))
+```
+
+Let’s focus only on pizza places for now, and re-examine grades by
+borough.
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "Pizza")) |> 
+  group_by(boro, grade) |> 
+  summarize(n = n()) |> 
+  pivot_wider(names_from = grade, values_from = n)
+```
+
+    ## `summarise()` has grouped output by 'boro'. You can override using the
+    ## `.groups` argument.
+
+    ## # A tibble: 5 × 3
+    ## # Groups:   boro [5]
+    ##   boro              A     B
+    ##   <chr>         <int> <int>
+    ## 1 Bronx             9     3
+    ## 2 Brooklyn          6    NA
+    ## 3 Manhattan        26     8
+    ## 4 Queens           17    NA
+    ## 5 Staten Island     5    NA
+
+That doesn’t look right – for sure there are more pizza place ratings
+than that! The problem is that the match in str_detect is case-sensitive
+until we tell it not to be:
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "[Pp][Ii][Zz][Zz][Aa]")) |> 
+  group_by(boro, grade) |> 
+  summarize(n = n()) |> 
+  pivot_wider(names_from = grade, values_from = n)
+```
+
+    ## `summarise()` has grouped output by 'boro'. You can override using the
+    ## `.groups` argument.
+
+    ## # A tibble: 5 × 4
+    ## # Groups:   boro [5]
+    ##   boro              A     B     C
+    ##   <chr>         <int> <int> <int>
+    ## 1 Bronx          1170   305    56
+    ## 2 Brooklyn       1948   296    61
+    ## 3 Manhattan      1983   420    76
+    ## 4 Queens         1647   259    48
+    ## 5 Staten Island   323   127    21
+
+The table is okay but I’d like to visualize this.
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "[Pp][Ii][Zz][Zz][Aa]")) |>
+  ggplot(aes(x = boro, fill = grade)) + 
+  geom_bar() 
+```
+
+<img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-20-1.png" width="90%" />
+Might help to have things in a different order – maybe number of pizza
+places? Fortunately this can be done using `fct_infreq`.
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "[Pp][Ii][Zz][Zz][Aa]")) |>
+  mutate(boro = fct_infreq(boro)) |>
+  ggplot(aes(x = boro, fill = grade)) + 
+  geom_bar() 
+```
+
+<img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-21-1.png" width="90%" />
+
+Suppose I want to rename a borough. I could try using str_replace.
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "[Pp][Ii][Zz][Zz][Aa]")) |>
+  mutate(
+    boro = fct_infreq(boro),
+    boro = str_replace(boro, "Manhattan", "The City")) |>
+  ggplot(aes(x = boro, fill = grade)) + 
+  geom_bar() 
+```
+
+<img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-22-1.png" width="90%" />
+
+If I tried base R (maybe because I found some code online), I might try
+to do this using `replace`.
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, "[Pp][Ii][Zz][Zz][Aa]")) |>
+  mutate(
+    boro = fct_infreq(boro),
+    boro = replace(boro, which(boro == "Manhattan"), "The City")) |>
+  ggplot(aes(x = boro, fill = grade)) + 
+  geom_bar()
+```
+
+    ## Warning: There was 1 warning in `mutate()`.
+    ## ℹ In argument: `boro = replace(boro, which(boro == "Manhattan"), "The City")`.
+    ## Caused by warning in `[<-.factor`:
+    ## ! invalid factor level, NA generated
+
+<img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-23-1.png" width="90%" />
+Fortunately there is a dedicated function for renaming factor levels:
+
+``` r
+rest_inspec |> 
+  filter(str_detect(dba, regex("pizza", ignore_case = TRUE))) |>
+  mutate(
+    boro = fct_infreq(boro),
+    boro = fct_recode(boro, "The City" = "Manhattan")) |>
+  ggplot(aes(x = boro, fill = grade)) + 
+  geom_bar()
+```
+
+<img src="Strings_and_factors_files/figure-gfm/unnamed-chunk-24-1.png" width="90%" />
